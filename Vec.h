@@ -14,6 +14,9 @@ struct Vec3f {
 	float y = 0;
 	float z = 0;
 
+	Vec3f() = default;
+	Vec3f(float x, float y, float z) : x(x), y(y), z(z) {}
+
 	// vec/vec ops
 	Vec3f operator+(const Vec3f& v) const { return { x + v.x, y + v.y, z + v.z }; }
 	Vec3f operator-(const Vec3f& v) const { return { x - v.x, y - v.y, z - v.z }; }

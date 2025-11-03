@@ -19,20 +19,26 @@ Model create_cube() {
     cube.vertices.push_back({ 1,  1,  1 }); // 6
     cube.vertices.push_back({ -1,  1,  1 }); // 7
 
-    // 12 edges
-    cube.faces.push_back({ 0, 1 }); // back face
-    cube.faces.push_back({ 1, 2 });
-    cube.faces.push_back({ 2, 3 });
-    cube.faces.push_back({ 3, 0 });
-    cube.faces.push_back({ 4, 5 }); // front face
-    cube.faces.push_back({ 5, 6 });
-    cube.faces.push_back({ 6, 7 });
-    cube.faces.push_back({ 7, 4 });
-    cube.faces.push_back({ 0, 4 }); // connecting edges
-    cube.faces.push_back({ 1, 5 });
-    cube.faces.push_back({ 2, 6 });
-    cube.faces.push_back({ 3, 7 });
-
+    // 12 triangle faces
+    // back face
+    cube.faces.push_back({ 0,3,2 });
+	cube.faces.push_back({ 0,2,1 });
+	// front face
+	cube.faces.push_back({ 4,5,6 });
+	cube.faces.push_back({ 4,6,7 });
+	// left face
+	cube.faces.push_back({ 0,4,7 });
+	cube.faces.push_back({ 0,7,3 });
+	// right face
+	cube.faces.push_back({ 1,2,6 });
+	cube.faces.push_back({ 1,6,5 });
+	// bottom face
+	cube.faces.push_back({ 0,1,5 });
+	cube.faces.push_back({ 0,5,4 });
+	// top face
+	cube.faces.push_back({ 3,7,6 });
+	cube.faces.push_back({ 3,6,2 });
+    // man, i love github copilot
     return cube;
 }
 
@@ -59,10 +65,10 @@ int main() {
 
     Mat4f rotation_x = Mat4f::rotation_x(PI / 4.0f); // 45 degrees
     Mat4f rotation_y = Mat4f::rotation_y(PI / 4.0f);
-    Mat4f model_matrix = rotation_x * rotation_y;
+	Mat4f model_matrix = Mat4f::translation({ 0,0,-5 }) * rotation_x * rotation_y;  // move cube back for 5 units
 
-    Vec3f eye_pos = { 0, 0, 5 };
-    Vec3f center_pos = { 0, 0, 0 };
+    Vec3f eye_pos = { 0, 0, 0 };
+    Vec3f center_pos = { 0, 0, -1 };
     Vec3f up_dir = { 0, 1, 0 };
     Mat4f view_matrix = Mat4f::lookAt(eye_pos, center_pos, up_dir);
 
@@ -70,18 +76,45 @@ int main() {
 
     Mat4f mvp = projection_matrix * view_matrix * model_matrix;
 
-    for (const auto& face : cube.faces) {
-        Vec3f v0_world = cube.vertices[face[0]];
-        Vec3f v1_world = cube.vertices[face[1]];
+    // clear buffers
+    my_image.clear_buffers();
 
-        Vec3f v0_screen = project(v0_world, mvp, width, height);
-        Vec3f v1_screen = project(v1_world, mvp, width, height);
+    // render loop
+    for (const auto& face : cube.faces)
+    {
+		Vec3f v0_world = cube.vertices[face[0]];
+		Vec3f v1_world = cube.vertices[face[1]];
+		Vec3f v2_world = cube.vertices[face[2]];
 
-        my_image.drawLine(
-            static_cast<int>(v0_screen.x), static_cast<int>(v0_screen.y),
-            static_cast<int>(v1_screen.x), static_cast<int>(v1_screen.y),
-            white
+		// back face culling
+		// transform vertices to screen space
+		Vec3f v0_world_tf = (model_matrix * Vec4f(v0_world, 1.0f)).to_vec3f();
+		Vec3f v1_world_tf = (model_matrix * Vec4f(v1_world, 1.0f)).to_vec3f();
+		Vec3f v2_world_tf = (model_matrix * Vec4f(v2_world, 1.0f)).to_vec3f();
+    
+		// calculate face normal
+		Vec3f normal = (v1_world_tf - v0_world_tf).cross(v2_world_tf - v0_world_tf).normalize();
+        
+		// calculate view direction
+		Vec3f view_dir = (v0_world_tf - eye_pos).normalize();
+
+		// if dot prod positive, cull face
+		if (normal.dot(view_dir) >= 0) continue;
+
+        // projection
+		// run vertices through mvp matrix
+		Vec3f v0_screen = project(v0_world, mvp, width, height);
+		Vec3f v1_screen = project(v1_world, mvp, width, height);
+		Vec3f v2_screen = project(v2_world, mvp, width, height);
+
+        // draw
+        Color face_color = Color(
+            50 + (v0_world.x + 1) * 100,
+            (v0_world.y + 1) * 127,
+            (v0_world.z + 1) * 127
         );
+
+		my_image.drawTriangle(v0_screen, v1_screen, v2_screen, face_color);
     }
 
     // save
