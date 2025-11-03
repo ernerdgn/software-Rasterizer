@@ -5,6 +5,7 @@
 #include <limits> //std::numeric_limits
 #include "Vec.h"
 #include "Texture.h"
+#include "IShader.h"
 
 class Image {
 public:
@@ -14,7 +15,7 @@ public:
 	// draw line, bresenham's algo
 	// void drawLine(int x0, int y0, int x1, int y1, const Color& c);
 	// draw a filled triangle
-	void drawTriangle(Vec3f v_screen[3], Vec2f uvs[3], const Texture& texture);
+	void drawTriangle(Vec3f v_screen[3], IShader& shader);
 	// clear color and depth buffers
 	void clear_buffers();
 	// wrt img to .tga file

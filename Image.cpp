@@ -83,7 +83,7 @@ Vec3f barycentric(const Vec3f* pts, int x, int y)
 	return { u_coord, v_coord, w_coord };
 }
 
-void Image::drawTriangle(Vec3f v_screen[3], Vec2f uvs[3], const Texture& texture)
+void Image::drawTriangle(Vec3f v_screen[3], IShader& shader)
 {
 	// bounding box
 	int min_x = static_cast<int>(std::max(0.0f, std::min({ v_screen[0].x, v_screen[1].x, v_screen[2].x })));
@@ -95,40 +95,20 @@ void Image::drawTriangle(Vec3f v_screen[3], Vec2f uvs[3], const Texture& texture
 	{
 		for (int x = min_x; x <= max_x; x++)
 		{
+
 			// barycentric coords
 			Vec3f bc_coords = barycentric(v_screen, x, y);
 			if (bc_coords.x < 0 || bc_coords.y < 0 || bc_coords.z < 0) continue;
 
-			// interpolated depth (w)
+			// interpolate depth
 			float w_interpolated = bc_coords.x * v_screen[0].z +
 				bc_coords.y * v_screen[1].z +
 				bc_coords.z * v_screen[2].z;
 
-			// perspective-correct interpolation of UVs
-
-			// interpolate 1/w
-			float one_over_w_interp = bc_coords.x * (1.0f / v_screen[0].z) +
-				bc_coords.y * (1.0f / v_screen[1].z) +
-				bc_coords.z * (1.0f / v_screen[2].z);
-
-			// interpolate u/w and v/w
-			float u_over_w_interp = bc_coords.x * uvs[0].x * (1.0f / v_screen[0].z) +
-				bc_coords.y * uvs[1].x * (1.0f / v_screen[1].z) +
-				bc_coords.z * uvs[2].x * (1.0f / v_screen[2].z);
-
-			float v_over_w_interp = bc_coords.x * uvs[0].y * (1.0f / v_screen[0].z) +
-				bc_coords.y * uvs[1].y * (1.0f / v_screen[1].z) +
-				bc_coords.z * uvs[2].y * (1.0f / v_screen[2].z);
-
-			// get final uv coords
-			float u_final = u_over_w_interp / one_over_w_interp;
-			float v_final = v_over_w_interp / one_over_w_interp;
-
-			// sample texture
-			Color texture_color = texture.sample(u_final, v_final);
-
-			// draw pixel
-			set_pixel(x, y, w_interpolated, texture_color);
+			// call fragment shader
+			Color final_color;
+			// draw pixel if fragment shader returns true
+			if (shader.fragment(bc_coords, final_color)) set_pixel(x, y, w_interpolated, final_color);
 		}
 	}
 }

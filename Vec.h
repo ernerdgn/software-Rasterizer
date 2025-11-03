@@ -28,6 +28,7 @@ struct Vec3f {
 	// vec/vec ops
 	Vec3f operator+(const Vec3f& v) const { return { x + v.x, y + v.y, z + v.z }; }
 	Vec3f operator-(const Vec3f& v) const { return { x - v.x, y - v.y, z - v.z }; }
+	Vec3f operator*(const Vec3f& v) const { return { x * v.x, y * v.y, z * v.z }; }
 	
 	// vec/scalar ops
 	Vec3f operator*(float f) const { return { x * f, y * f, z * f }; }

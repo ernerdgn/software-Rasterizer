@@ -6,6 +6,7 @@
 #include "Mat4f.h"
 #include "Model.h"
 #include "Texture.h"
+#include "PhongShader.h"
 
 // hard-coded cube model
 //Model create_cube() {
@@ -55,75 +56,80 @@ Vec3f project(const Vec3f& v, const Mat4f& mvp, int width, int height) {
     return { screen_x, screen_y, w };
 }
 
-int main() {
+int main()
+{
     const int width = 800;
-	const int height = 800; // made square for simplicity
+    const int height = 800;
     const float aspect_ratio = (float)width / (float)height;
 
     Image my_image(width, height);
 
-    // load model and texture
+	// load model and texture
     Model model("african_head.obj");
     Texture texture;
     if (!texture.load_tga_file("african_head_diffuse_uncomp.tga")) return -1;
 
-	// transformation matrices
-	Mat4f model_matrix = Mat4f::translation({ 0, 0, -3 }); // move back 3 units
-
-	Vec3f eye_pos = { 0, 0, 0 }; // cam at origin
-	Vec3f center_pos = { 0, 0, -1 }; // looking down -z
+    // transformations
+    Vec3f eye_pos = { 0, 0, 3 };
+    Vec3f center_pos = { 0, 0, 0 };
     Vec3f up_dir = { 0, 1, 0 };
+    //Vec3f light_pos = { 1, 1, 3 }; // light pos
+    //Vec3f light_pos = { 0, -1, 3 };  // spooky
+    Vec3f light_pos = { 5, 1, 3 };  // from right
+
+    Mat4f model_matrix = Mat4f::identity();
     Mat4f view_matrix = Mat4f::lookAt(eye_pos, center_pos, up_dir);
-
     Mat4f projection_matrix = Mat4f::perspective(PI / 3.0f, aspect_ratio, 0.1f, 100.0f);
-
     Mat4f mvp = projection_matrix * view_matrix * model_matrix;
 
-    // clean buffers
+	// shader setup
+    PhongShader shader;
+    shader.model = &model;
+    shader.texture = &texture;
+    shader.uniform_mvp = mvp;
+    shader.uniform_model_matrix = model_matrix;
+    shader.uniform_light_pos = light_pos;
+    shader.uniform_camera_pos = eye_pos;
+
+    // clear buffers
     my_image.clear_buffers();
 
-    // render triangles
-    for (const auto& face : model.faces)
+	// render loop
+    for (int i = 0; i < model.faces.size(); ++i)
     {
-		// size check
-        if (face.size() != 3) continue;
+        const auto& face_indices = model.faces[i];
+        if (face_indices.size() != 3) continue;
 
-		// get the 3 vertices of the face in world space
-        Vec3f v0_world = model.vertices[face[0].v_idx];
-        Vec3f v1_world = model.vertices[face[1].v_idx];
-        Vec3f v2_world = model.vertices[face[2].v_idx];
+		// run vertex shader for each vertex of the triangle
+        Vec4f clip_coords[3];
+        for (int j = 0; j < 3; ++j) clip_coords[j] = shader.vertex(i, j);
 
-		// cull back-faces
-        Vec3f v0_world_tf = (model_matrix * Vec4f(v0_world, 1.0f)).to_vec3f();
-        Vec3f v1_world_tf = (model_matrix * Vec4f(v1_world, 1.0f)).to_vec3f();
-        Vec3f v2_world_tf = (model_matrix * Vec4f(v2_world, 1.0f)).to_vec3f();
+		// project to screen space
+        Vec3f v_screen[3];
+        for (int j = 0; j < 3; ++j)
+        {
+            Vec3f ndc = clip_coords[j].to_vec3f();
+            float screen_x = (ndc.x + 1.0f) * 0.5f * width;
+            float screen_y = (1.0f - ndc.y) * 0.5f * height; // flip Y
+            v_screen[j] = { screen_x, screen_y, clip_coords[j].w }; // store w for depth
+        }
 
-        Vec3f normal = (v1_world_tf - v0_world_tf).cross(v2_world_tf - v0_world_tf).normalize();
-        Vec3f view_dir = (v0_world_tf - eye_pos).normalize();
-        if (normal.dot(view_dir) <= 0.0f) continue; // cull
+		// back-face culling
+        Vec3f v0_screen = { v_screen[0].x, v_screen[0].y, 0 };
+        Vec3f v1_screen = { v_screen[1].x, v_screen[1].y, 0 };
+        Vec3f v2_screen = { v_screen[2].x, v_screen[2].y, 0 };
+        Vec3f normal_screen = (v1_screen - v0_screen).cross(v2_screen - v0_screen).normalize();
 
-        // projection
-        Vec3f v_screen[3] = {
-            project(v0_world, mvp, width, height),
-            project(v1_world, mvp, width, height),
-            project(v2_world, mvp, width, height)
-        };
+        if (normal_screen.z < 0) continue; // cull
 
-		// get uv coords
-        Vec2f uvs[3] = {
-            model.uvs[face[0].vt_idx],
-            model.uvs[face[1].vt_idx],
-            model.uvs[face[2].vt_idx]
-        };
-
-        // draw
-        my_image.drawTriangle(v_screen, uvs, texture);
+        // draw triangle
+        my_image.drawTriangle(v_screen, shader);
     }
 
     // save
     const std::string filename = "output.tga";
-    if (my_image.write_tga_file(filename, false)) std::cout << "image saved to " << filename << std::endl;
-    else std::cerr << "error: cant save image" << std::endl;
+    if (my_image.write_tga_file(filename, false)) std::cout << "Image saved successfully to " << filename << std::endl;
+    else std::cerr << "Error saving image." << std::endl;
 
     return 0;
 }
