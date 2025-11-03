@@ -83,33 +83,52 @@ Vec3f barycentric(const Vec3f* pts, int x, int y)
 	return { u_coord, v_coord, w_coord };
 }
 
-void Image::drawTriangle(Vec3f v0_screen, Vec3f v1_screen, Vec3f v2_screen, const Color& c)
+void Image::drawTriangle(Vec3f v_screen[3], Vec2f uvs[3], const Texture& texture)
 {
-	Vec3f screen_verts[3] = { v0_screen, v1_screen, v2_screen };
+	// bounding box
+	int min_x = static_cast<int>(std::max(0.0f, std::min({ v_screen[0].x, v_screen[1].x, v_screen[2].x })));
+	int max_x = static_cast<int>(std::min((float)m_width - 1, std::max({ v_screen[0].x, v_screen[1].x, v_screen[2].x })));
+	int min_y = static_cast<int>(std::max(0.0f, std::min({ v_screen[0].y, v_screen[1].y, v_screen[2].y })));
+	int max_y = static_cast<int>(std::min((float)m_height - 1, std::max({ v_screen[0].y, v_screen[1].y, v_screen[2].y })));
 
-	// compute bounding box
-	int min_x = static_cast<int>(std::max(.0f, std::min({v0_screen.x, v1_screen.x, v2_screen.x})));
-	int max_x = static_cast<int>(std::min((float)m_width - 1, std::max({ v0_screen.x, v1_screen.x, v2_screen.x })));
-	int min_y = static_cast<int>(std::max(.0f, std::min({ v0_screen.y, v1_screen.y, v2_screen.y })));
-	int max_y = static_cast<int>(std::min((float)m_height - 1, std::max({ v0_screen.y, v1_screen.y, v2_screen.y })));
-
-	// loop over bounding box pixels
 	for (int y = min_y; y <= max_y; y++)
 	{
 		for (int x = min_x; x <= max_x; x++)
 		{
-			// compute barycentric coords
-			Vec3f bc_coords = barycentric(screen_verts, x, y);
-
-			// if point is inside triangle
+			// barycentric coords
+			Vec3f bc_coords = barycentric(v_screen, x, y);
 			if (bc_coords.x < 0 || bc_coords.y < 0 || bc_coords.z < 0) continue;
 
-			float z_interpolated =
-				v0_screen.z * bc_coords.x +
-				v1_screen.z * bc_coords.y +
-				v2_screen.z * bc_coords.z;
+			// interpolated depth (w)
+			float w_interpolated = bc_coords.x * v_screen[0].z +
+				bc_coords.y * v_screen[1].z +
+				bc_coords.z * v_screen[2].z;
 
-			set_pixel(x, y, z_interpolated, c);
+			// perspective-correct interpolation of UVs
+
+			// interpolate 1/w
+			float one_over_w_interp = bc_coords.x * (1.0f / v_screen[0].z) +
+				bc_coords.y * (1.0f / v_screen[1].z) +
+				bc_coords.z * (1.0f / v_screen[2].z);
+
+			// interpolate u/w and v/w
+			float u_over_w_interp = bc_coords.x * uvs[0].x * (1.0f / v_screen[0].z) +
+				bc_coords.y * uvs[1].x * (1.0f / v_screen[1].z) +
+				bc_coords.z * uvs[2].x * (1.0f / v_screen[2].z);
+
+			float v_over_w_interp = bc_coords.x * uvs[0].y * (1.0f / v_screen[0].z) +
+				bc_coords.y * uvs[1].y * (1.0f / v_screen[1].z) +
+				bc_coords.z * uvs[2].y * (1.0f / v_screen[2].z);
+
+			// get final uv coords
+			float u_final = u_over_w_interp / one_over_w_interp;
+			float v_final = v_over_w_interp / one_over_w_interp;
+
+			// sample texture
+			Color texture_color = texture.sample(u_final, v_final);
+
+			// draw pixel
+			set_pixel(x, y, w_interpolated, texture_color);
 		}
 	}
 }

@@ -8,6 +8,14 @@ struct Vec2i {
 	int y = 0;
 };
 
+struct Vec2f {
+	float x = 0;
+	float y = 0;
+
+	Vec2f operator+(const Vec2f& v) const { return { x + v.x, y + v.y }; }
+	Vec2f operator*(float f) const { return { x * f, y * f }; }
+};
+
 // vec3f for 3d coord
 struct Vec3f {
 	float x = 0;

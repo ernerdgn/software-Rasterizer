@@ -21,6 +21,12 @@
     <ClCompile Include="Image.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Model.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Color.h">
@@ -36,6 +42,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Mat4f.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Texture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="IShader.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="PhongShader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
